@@ -104,12 +104,9 @@ function crearProducto(e) {
     const archivo = document.getElementById("imagenProd").files[0];
     if (archivo) {
     const imagenURL = URL.createObjectURL(archivo); // crea URL temporal
-    div.innerHTML =
-        "<img src='" + imagenURL + "' alt='" + nombre.value + "'>" +
-        "<p><strong>" + nombre.value + "</strong></p>";
+    div.innerHTML = "<img src='" + imagenURL + "' alt='" + nombre.value + "'>" +
+                    "<p><strong>" + nombre.value + "</strong></p>";
 }
-
-
 
     // Evento de clic  Mostrar detalles
     div.querySelector("img").addEventListener("click", () => { //cuando escucha clic en la imagen
@@ -117,17 +114,30 @@ function crearProducto(e) {
     });
 
     catalogo.appendChild(div); //inserta el producto al final del catalogo
-    
+    actualizarTotalProductos()//funcion que actualiza los productos  
 
-    // OCULTAR FORMULARIO
+    // vuelva a ocultar el formulario
     formContainer.classList.add("oculto");//vuelve a ocultar el formulario
     formContainer.innerHTML = ""; // y limpia los campos
 }//crear producto
 
 
+
+function actualizarTotalProductos() {//actualiza el contador de productos
+    let total = catalogo.querySelectorAll(".producto").length;
+    document.getElementById("contadorProd").textContent = total;
+}//actualizarTotalProductos
+
+
+
+
 // Mostrar detalles del producto
 function mostrarDetalles(contenedor, id, nombre, desc, precio) {
 
+    //primero elimina si ya existe
+    const anterior = contenedor.querySelector(".detalles");
+    if (anterior) anterior.remove();
+    //y luego crea nuevamente
     const nuevo = document.createElement("div");
     nuevo.classList.add("detalles");
 
@@ -137,9 +147,9 @@ function mostrarDetalles(contenedor, id, nombre, desc, precio) {
         "<strong>Precio:</strong> " + precio + " €<br>" +
         "<strong>Descripción:</strong> " + desc;
 
-    //ocultar detalles al hacer doble clic
+    //oculta detalles al hacer doble clic
     nuevo.addEventListener("dblclick", function () {
-        nuevo.remove();  // elimina el cuadro de detalles
+        nuevo.remove();  // elimina el cuadro de detalles si haces dobleclick encima
     });
 
     contenedor.appendChild(nuevo);

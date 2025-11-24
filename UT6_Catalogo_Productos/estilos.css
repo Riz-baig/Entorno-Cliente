@@ -1,6 +1,12 @@
 body {
     font-family: Arial, sans-serif;
     margin: 20px;
+    background-color: rgb(101, 194, 231);
+}
+
+h1{
+    color: #333;
+    text-align: center;
 }
 .oculto {/* Ocultar formulario inicialmente */
     display: none;
