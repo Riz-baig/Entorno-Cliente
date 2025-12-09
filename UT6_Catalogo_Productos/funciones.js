@@ -3,10 +3,8 @@ const btnAdd = document.getElementById("btnAdd");
 const formContainer = document.getElementById("formulariodiv");//aqui aparecera el formulario dinamico
 const catalogo = document.getElementById("catalogo");//aqui se mostraran los productos creados
 
-
 // Mostrar el formulario al pulsar el botón
 btnAdd.addEventListener("click", generarFormulario);
-
 
 // Crear formulario dinámico
 function generarFormulario() {
@@ -36,6 +34,7 @@ function generarFormulario() {
             <input type="file" id="imagenProd" accept="image/*">
             <div id="errImagen" class="errorCampo"></div>
             <button type="submit">Crear</button>
+
         </form>`;
 
     formContainer.classList.remove("oculto");//borra lo oculto que es para css
@@ -44,7 +43,6 @@ function generarFormulario() {
         .addEventListener("submit", crearProducto);//llama la funcion crear producto cuando escucha el boton crear de linea 38
 }//generar formulario
 
-let num = 1;//es para controlar la imagen
 // Validación y creación del producto
 function crearProducto(e) {
     e.preventDefault();//esto evita que recargue la pagina para que no se borre nada
@@ -54,7 +52,9 @@ function crearProducto(e) {
     const nombre = document.getElementById("nombreProd");
     const desc = document.getElementById("descProd");
     const precio = document.getElementById("precioProd");
-    const imagen = document.getElementById("imagenProd"); 
+    const imagen = document.getElementById("imagenProd");
+
+    const btnCrear = e.target.querySelector("button");//capto el boton crear del formulario
 
     let valido = true;//booleano que controla los errores
 
@@ -64,14 +64,7 @@ function crearProducto(e) {
         id.classList.add("error");//añade class para darle color con css
         valido = false;
     }
-    const existe = Array.from(catalogo.querySelectorAll(".producto"))// Comprobar si el ID ya existe
-                    .some(prod => prod.dataset.id === id.value);
 
-    if (existe) {
-        document.getElementById("errId").textContent = "Este ID ya existe.";
-        id.classList.add("error");//llama a input.error de css
-        valido = false;
-    }
     if (nombre.value.trim() === "") {
         document.getElementById("errNombre").textContent = "El nombre es obligatorio.";
         nombre.classList.add("error");
@@ -94,42 +87,105 @@ function crearProducto(e) {
     }
     if (!valido) return;  // Si falla, no sigue
 
+    const producto = {
+        id: id.value,
+        nombre: nombre.value,
+        desc: desc.value,
+        precio: precio.value
+    };
 
-    // crear tarjeta del producto
-    const div = document.createElement("div");//crea un div vacio
-    div.classList.add("producto");//asina la clase para aplicar css
-    div.dataset.id = id.value;
+    const archivo = imagen.files[0]; //
+    btnCrear.disabled = true; //aqui cambio el estado del boton
+    btnCrear.textContent = "Guardando...";// y le asigno el texto
 
-    // Leer archivo seleccionado de la imagen
-    const archivo = document.getElementById("imagenProd").files[0];
-    if (archivo) {
-    const imagenURL = URL.createObjectURL(archivo); // crea URL temporal
-    div.innerHTML = "<img src='" + imagenURL + "' alt='" + nombre.value + "'>" +
-                    "<p><strong>" + nombre.value + "</strong></p>";
-}
+    validarImagen(archivo)            // Primero valida la imagen
+        .then(() => {
+            return API.guardarProducto(producto);   //Devuelve la promesa de API
+        })
+        .then(msg => {
+            console.log(msg);// Guardado correcto, mensaje del servidor
+            crearTarjeta(producto, archivo);
+            actualizarTotalProductos();
+            cerrarFormulario();
+        })
+        .catch(err => {
+            //Cualquier error (imagen inválida o ID duplicado)
+            document.getElementById("errId").textContent = err;
+            id.classList.add("error");
+        })
+        .finally(() => {
+            // en cualquier caso restauramos el botón
+            btnCrear.disabled = false;
+            btnCrear.textContent = "Crear";
+        });
 
-    // Evento de clic  Mostrar detalles
-    div.querySelector("img").addEventListener("click", () => { //cuando escucha clic en la imagen
-        mostrarDetalles(div, id.value, nombre.value, desc.value, precio.value); //llama a la funcion mostrar detalles pasandole todos los parametros
-    });
-
-    catalogo.appendChild(div); //inserta el producto al final del catalogo
-    actualizarTotalProductos()//funcion que actualiza los productos  
-
-    // vuelva a ocultar el formulario
-    formContainer.classList.add("oculto");//vuelve a ocultar el formulario
-    formContainer.innerHTML = ""; // y limpia los campos
 }//crear producto
 
+function crearTarjeta(producto, archivoImagen) {
 
+    const div = document.createElement("div");// Crear el contenedor del producto
+    div.classList.add("producto"); //añade la clase para dar estilos
+    div.dataset.id = producto.id; //genera data-id en html, dataset permite añadir atributos personalizados
+    const imagenURL = URL.createObjectURL(archivoImagen);// Crear url temporal de la imagen
+
+    div.innerHTML = `<img src="${imagenURL}" alt="${producto.nombre}">
+                    <p><strong>${producto.nombre}</strong></p>
+                    <button class="btnEliminar">Eliminar</button>`;
+
+    div.querySelector("img").addEventListener("click", () => {// Evento de clic: mostrar detalles
+        mostrarDetalles(div, producto.id, producto.nombre, producto.desc, producto.precio);
+    });
+
+    div.querySelector(".btnEliminar").addEventListener("click", () => {// Evento para eliminar producto
+        eliminarProducto(div, producto.id);
+    });
+
+    catalogo.appendChild(div);// Añadir tarjeta al catálogo
+}
+
+async function eliminarProducto(tarjeta, id) {
+    tarjeta.style.opacity = "0.5";   //cambio de opacidad
+
+    try {
+        const msg = await API.borrarProducto(id);//borrarProducto devuelve una promesa poreso uso await, el código se detiene hasta que la api responda
+        console.log(msg);  //si la api resuelva
+        tarjeta.remove(); //elimina la tarjeta
+        actualizarTotalProductos(); //actualiza el contador
+
+    } catch (err) {
+
+        alert(err);  // si la api respode con error
+        tarjeta.style.opacity = "1"; // en caso de error la tarjeta vuelve a tener su opcidad normal
+    }
+}
+
+// Validar imagen
+function validarImagen(archivo) {
+
+    return new Promise((valido, error) => {// de si la imagen carga bien  o falla
+
+        const img = new Image();
+        const url = URL.createObjectURL(archivo);// Convierto el archivo seleccionado en url, en realidad es la ruta del archivo
+
+        img.onload = () => { // si todo esta bien, la promesa da ok
+            valido("Imagen válida");
+        };
+        img.onerror = () => { //si la imagen falla al cargar entra en esta condición
+            error("La imagen no es válida o está dañada");
+        };
+        img.src = url;// intenta cargar la imagen y pueden ocurrir dos cosas, onload o enerror
+    });
+}
 
 function actualizarTotalProductos() {//actualiza el contador de productos
     let total = catalogo.querySelectorAll(".producto").length;
     document.getElementById("contadorProd").textContent = total;
 }//actualizarTotalProductos
 
-
-
+function cerrarFormulario() {
+    formContainer.classList.add("oculto"); // oculta el formulario dinámico
+    formContainer.innerHTML = "";          // vacía el contenido
+}
 
 // Mostrar detalles del producto
 function mostrarDetalles(contenedor, id, nombre, desc, precio) {
@@ -137,7 +193,7 @@ function mostrarDetalles(contenedor, id, nombre, desc, precio) {
     //primero elimina si ya existe
     const anterior = contenedor.querySelector(".detalles");
     if (anterior) anterior.remove();
-    //y luego crea nuevamente
+
     const nuevo = document.createElement("div");
     nuevo.classList.add("detalles");
 
@@ -147,11 +203,9 @@ function mostrarDetalles(contenedor, id, nombre, desc, precio) {
         "<strong>Precio:</strong> " + precio + " €<br>" +
         "<strong>Descripción:</strong> " + desc;
 
-    //oculta detalles al hacer doble clic
     nuevo.addEventListener("dblclick", function () {
         nuevo.remove();  // elimina el cuadro de detalles si haces dobleclick encima
     });
 
     contenedor.appendChild(nuevo);
 }//mostrar detalles
-
